@@ -1,0 +1,6 @@
+x64/Debug/ProjectRobot.exe
+*.pdb
+x64/Release/ProjectRobot.exe
+x64/Release/ProjectRobot.iobj
+*.ilk
+x64/Release/ProjectRobot.ipdb
