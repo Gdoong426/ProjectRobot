@@ -422,9 +422,12 @@ void findContoursandMomentum( Mat &ThreshImg, Mat &img, Point &lastPosition, Poi
 		biggerRect += inflationSize;
 		Point center((boundRect[largest_area_index].tl().x + boundRect[largest_area_index].br().x) / 2, (boundRect[largest_area_index].tl().y + boundRect[largest_area_index].br().y) / 2);
 		int radius = norm(boundRect[largest_area_index].tl() - boundRect[largest_area_index].br());
-		rectangle(img, boundRect[largest_area_index].tl(), boundRect[largest_area_index].br(), Scalar(255, 255, 255), 2);
-		rectangle(img, biggerRect.tl(), biggerRect.br(), Scalar(255, 0, 0), 2);
-		circle(img, center, radius, Scalar(0, 255, 0), 2);
+		//rectangle(img, boundRect[largest_area_index].tl(), boundRect[largest_area_index].br(), Scalar(255, 255, 255), 2);
+		//rectangle(img, biggerRect.tl(), biggerRect.br(), Scalar(255, 0, 0), 2);
+		//circle(img, center, radius, Scalar(0, 255, 0), 2);
+		biggerRect += inflationPoint;
+		biggerRect += inflationSize;
+		colorbound = biggerRect;
 		
 	}
 
@@ -495,9 +498,9 @@ void backgroundsubtract( Mat frame, Mat prevImg, Mat &diff) {
 }
 
 
-void rgb2hsvimg(Mat ori, Mat &red, Mat &green) {
+void rgb2hsvimg(Mat ori, Mat &red, Mat &green, Mat &imgHSV) {
 
-	Mat imgHSV;
+	
 	cvtColor(ori, imgHSV, CV_BGR2HSV);
 	Mat imgThreshold_u, imgThreshold_l;
 	inRange(imgHSV, Scalar(iLowH, iLowS, iLowV), Scalar(iHighH, iHighS, iHighV), imgThreshold_l);
@@ -526,7 +529,7 @@ void CProjectRobotDlg::OnBnClickedButton5()
 		exit(-1);
 	}
 	
-	Mat frame ,img, prev;
+	Mat frame ,img, prev,imgHSV;
 	Mat gray, prevGray;
 	Mat diff_r, diff_g, diff; // robot movement image
 	Mat imgThreshold_g; // create Mat for red and green HUE image
@@ -541,7 +544,7 @@ void CProjectRobotDlg::OnBnClickedButton5()
 	vector<Point2f> cornersGreen, cornersGreen_prev, cornersGreen_temp;
 	cap >> prev;
 	cvtColor(prev, prevGray, CV_RGB2GRAY);
-	rgb2hsvimg(prev, prevRed, prevGreen);
+	rgb2hsvimg(prev, prevRed, prevGreen, imgHSV);
 	while (true) {
 		cap >> img;
 		frame = img.clone();
@@ -552,7 +555,7 @@ void CProjectRobotDlg::OnBnClickedButton5()
 			waitKey(0);
 			break;
 		}
-		rgb2hsvimg(frame, imgThreshold_r, imgThreshold_g);
+		rgb2hsvimg(frame, imgThreshold_r, imgThreshold_g, imgHSV);
 
 		// denoise and process the image;
 		imgprocessing(imgThreshold_r);
@@ -563,9 +566,21 @@ void CProjectRobotDlg::OnBnClickedButton5()
 		findContoursandMomentum(imgThreshold_g, frame, lastPosition_green, postPosition_green, greenRobotDir,greenDirAngle, greenbound);
 		findContoursandMomentum(imgThreshold_r, frame, lastPosition_red, postPosition_red, redRobotDir, redDirAngle, redbound);
 
+
+		// use camshift to track the robot and determine the orientation
+		MatND histl;
+		int bins = 25;
+		int histSize = MAX(bins, 2);
+		float hue_range[] = { 0,180 };
+		const float* ranges = { hue_range };
+		Mat redROI = imgHSV(redbound);
+		//equalizeHist(redROI, redROI);
+		//calcHist(&imgHSV,1,0,redROI,)
+		
+
 		// optical flow
-		cvtColor(frame, gray, CV_RGB2GRAY);
-		/*cvtColor(prev, prevGray, CV_RGB2GRAY);
+		/*cvtColor(frame, gray, CV_RGB2GRAY);
+		cvtColor(prev, prevGray, CV_RGB2GRAY);
 		findOpticalFlow(frame, prevGray, gray);*/
 
 		// background subtraction---------------------------------------------------------
@@ -618,6 +633,7 @@ void CProjectRobotDlg::OnBnClickedButton5()
 		imshow("Red Threshold", imgThreshold_r);
 		imshow("Green Threshold", imgThreshold_g);
 		imshow("Original", frame);
+		imshow("redROI", redROI);
 		//imshow("GreenM", diff_g);
 		//imshow("RedM", diff_r);
 		//imshow("move", diff);
@@ -632,6 +648,7 @@ void CProjectRobotDlg::OnBnClickedButton5()
 			destroyWindow("Red Threshold");
 			destroyWindow("Green Threshold");
 			destroyWindow("Original");
+			destroyWindow("redROI");
 			//destroyWindow("Movement");
 			//destroyWindow("GreenM");
 			//destroyWindow("RedM");
