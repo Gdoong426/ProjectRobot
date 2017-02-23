@@ -422,9 +422,9 @@ void findContoursandMomentum( Mat &ThreshImg, Mat &img, Point &lastPosition, Poi
 		biggerRect += inflationSize;
 		Point center((boundRect[largest_area_index].tl().x + boundRect[largest_area_index].br().x) / 2, (boundRect[largest_area_index].tl().y + boundRect[largest_area_index].br().y) / 2);
 		int radius = norm(boundRect[largest_area_index].tl() - boundRect[largest_area_index].br());
-		//rectangle(img, boundRect[largest_area_index].tl(), boundRect[largest_area_index].br(), Scalar(255, 255, 255), 2);
-		//rectangle(img, biggerRect.tl(), biggerRect.br(), Scalar(255, 0, 0), 2);
-		//circle(img, center, radius, Scalar(0, 255, 0), 2);
+		rectangle(img, boundRect[largest_area_index].tl(), boundRect[largest_area_index].br(), Scalar(255, 255, 255), 2);
+		rectangle(img, biggerRect.tl(), biggerRect.br(), Scalar(255, 0, 0), 2);
+		circle(img, center, radius, Scalar(0, 255, 0), 2);
 		
 	}
 
@@ -475,8 +475,7 @@ void findOpticalFlow( Mat &frame,Mat &prevGray, Mat &nowGray) {
 	Mat flow;
 	
 
-	//imshow("flow", temp1);
-	calcOpticalFlowFarneback(prevGray, nowGray, flow, 0.5, 4, 15, 3, 7, 1.2, 0);
+	//imshow("flow", temp1);Zaa
 	drawOptFlowMap(flow, temp3, 10, CV_RGB(0, 255, 0));
 	imshow("flow", temp3);
 
@@ -536,6 +535,7 @@ void CProjectRobotDlg::OnBnClickedButton5()
 
 
 	BackgroundSubtractorGMG pGMG;
+	Mat fgMaskGMG;
 
 	vector<Point2f> cornersRed, cornersRed_prev, cornersRed_temp;
 	vector<Point2f> cornersGreen, cornersGreen_prev, cornersGreen_temp;
@@ -568,11 +568,13 @@ void CProjectRobotDlg::OnBnClickedButton5()
 		/*cvtColor(prev, prevGray, CV_RGB2GRAY);
 		findOpticalFlow(frame, prevGray, gray);*/
 
-		// background subtraction
+		// background subtraction---------------------------------------------------------
 
-		backgroundsubtract(gray, prevGray, diff);
+		/*backgroundsubtract(gray, prevGray, diff);
 		backgroundsubtract(imgThreshold_g, prevGreen, diff_g);
 		backgroundsubtract(imgThreshold_r, prevRed, diff_r);
+
+		pGMG(imgThreshold_r, fgMaskGMG);
 
 		vector<vector<Point>> contours;
 		vector<Vec4i> hierarchy;
@@ -592,7 +594,8 @@ void CProjectRobotDlg::OnBnClickedButton5()
 			Rect mr = boundingRect(Mat(*itc));
 			rectangle(frame, mr, Scalar(255, 0, 0), 2);
 			++itc;
-		}
+		}*/
+		//---------------------------------------------------------------------------------
 
 		printf("red robot face angle: %d  ", (int)(redDirAngle * 180 / CV_PI));
 		printf("green robot face angle: %d  \n", (int)(greenDirAngle * 180 / CV_PI));
@@ -615,9 +618,10 @@ void CProjectRobotDlg::OnBnClickedButton5()
 		imshow("Red Threshold", imgThreshold_r);
 		imshow("Green Threshold", imgThreshold_g);
 		imshow("Original", frame);
-		imshow("GreenM", diff_g);
-		imshow("RedM", diff_r);
-		imshow("move", diff);
+		//imshow("GreenM", diff_g);
+		//imshow("RedM", diff_r);
+		//imshow("move", diff);
+		//imshow("GMG", fgMaskGMG);
 
 		prevGray = gray.clone();
 		prev = img.clone();
@@ -628,10 +632,10 @@ void CProjectRobotDlg::OnBnClickedButton5()
 			destroyWindow("Red Threshold");
 			destroyWindow("Green Threshold");
 			destroyWindow("Original");
-			destroyWindow("Movement");
-			destroyWindow("GreenM");
-			destroyWindow("RedM");
-			destroyWindow("move");
+			//destroyWindow("Movement");
+			//destroyWindow("GreenM");
+			//destroyWindow("RedM");
+			//destroyWindow("move");
 
 			break;
 		}
