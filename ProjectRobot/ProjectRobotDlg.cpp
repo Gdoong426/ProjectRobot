@@ -452,39 +452,7 @@ void findContoursandMomentum( Mat &ThreshImg, Mat &img, Point &lastPosition, Poi
 	
 }
 
-void drawOptFlowMap(const Mat& flow, Mat& cflowmap, int step, const Scalar& color) {
-	for (int y = 0; y < cflowmap.rows; y += step)
 
-		for (int x = 0; x < cflowmap.cols; x += step)
-
-		{
-			const Point2f& fxy = flow.at< Point2f>(y, x);
-
-			line(cflowmap, Point(x, y), Point(cvRound(x + fxy.x), cvRound(y + fxy.y)),
-				color);
-			circle(cflowmap, Point(cvRound(x + fxy.x), cvRound(y + fxy.y)), 1, color, -1);
-
-		}
-
-}
-
-void findOpticalFlow( Mat &frame,Mat &prevGray, Mat &nowGray) {
-	//find optical flow;
-	float s = 1.5;
-	Mat temp1, temp2, temp3;
-	resize(prevGray, temp1, Size(frame.size().width / s, frame.size().height / s));
-	resize(nowGray, temp2, Size(frame.size().width / s, frame.size().height / s));
-	resize(frame, temp3, Size(frame.size().width / s, frame.size().height / s));
-	Mat flow;
-	
-
-	//imshow("flow", temp1);Zaa
-	drawOptFlowMap(flow, temp3, 10, CV_RGB(0, 255, 0));
-	imshow("flow", temp3);
-
-	///  The following is for background subtraction.
-	
-}
 
 void backgroundsubtract( Mat frame, Mat prevImg, Mat &diff) {
 	Mat img = frame.clone();
@@ -543,8 +511,39 @@ void CProjectRobotDlg::OnBnClickedButton5()
 	vector<Point2f> cornersRed, cornersRed_prev, cornersRed_temp;
 	vector<Point2f> cornersGreen, cornersGreen_prev, cornersGreen_temp;
 	cap >> prev;
+	/* first image preprocessing-------------------------------------------------------------------------------- */
 	cvtColor(prev, prevGray, CV_RGB2GRAY);
 	rgb2hsvimg(prev, prevRed, prevGreen, imgHSV);
+	imgprocessing(prevRed);
+	imgprocessing(prevGreen);
+
+
+	findContoursandMomentum(prevRed, prev, lastPosition_red, postPosition_red, redRobotDir, redDirAngle, redbound);
+	findContoursandMomentum(prevGreen, prev, lastPosition_green, postPosition_green, greenRobotDir, greenDirAngle, greenbound);
+
+	/*Kalman filter to find position and velocity of tracking points*/
+	int stateSize = 4;
+	int measSize = 2;
+	int contrSize = 0;
+	KalmanFilter KF(stateSize, measSize, contrSize);
+	Mat state(stateSize, 1, CV_32F);
+	Mat meas(measSize, 1, CV_32F);
+	setIdentity(KF.transitionMatrix);
+	KF.transitionMatrix = *(Mat_<float>(4, 4) << 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1);
+	Mat_<float> measurement = Mat::zeros(2, 1, CV_32F);
+	Mat processNoise(2, 1, CV_32F);
+	measurement.setTo(Scalar(0));
+
+	KF.statePre.at<int>(0) = lastPosition_red.x;
+	KF.statePre.at<int>(1) = lastPosition_red.y;
+	KF.statePre.at<int>(2) = 0;
+	KF.statePre.at<int>(3) = 0;
+	setIdentity(KF.processNoiseCov, Scalar::all(1e-4));
+	setIdentity(KF.measurementNoiseCov, Scalar::all(10));
+	setIdentity(KF.errorCovPost, Scalar::all(0.1));
+	
+
+	/*start playing video--------------------------------------------*/
 	while (true) {
 		cap >> img;
 		frame = img.clone();
@@ -567,49 +566,10 @@ void CProjectRobotDlg::OnBnClickedButton5()
 		findContoursandMomentum(imgThreshold_r, frame, lastPosition_red, postPosition_red, redRobotDir, redDirAngle, redbound);
 
 
-		// use camshift to track the robot and determine the orientation
-		MatND histl;
-		int bins = 25;
-		int histSize = MAX(bins, 2);
-		float hue_range[] = { 0,180 };
-		const float* ranges = { hue_range };
-		Mat redROI = imgHSV(redbound);
-		//equalizeHist(redROI, redROI);
-		//calcHist(&imgHSV,1,0,redROI,)
-		
-
-		// optical flow
-		/*cvtColor(frame, gray, CV_RGB2GRAY);
-		cvtColor(prev, prevGray, CV_RGB2GRAY);
-		findOpticalFlow(frame, prevGray, gray);*/
-
-		// background subtraction---------------------------------------------------------
-
-		/*backgroundsubtract(gray, prevGray, diff);
-		backgroundsubtract(imgThreshold_g, prevGreen, diff_g);
-		backgroundsubtract(imgThreshold_r, prevRed, diff_r);
-
-		pGMG(imgThreshold_r, fgMaskGMG);
-
-		vector<vector<Point>> contours;
-		vector<Vec4i> hierarchy;
-		findContours(diff, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
-
-		vector<vector<Point>> hull(contours.size());
-		for (int i = 0; i < contours.size(); i++) {
-			convexHull(Mat(contours[i]), hull[i], false);
-		}
+		// use Kalman Filter to track points
 
 
-		vector<Rect> output;
-		vector<vector<Point>>::iterator itc = contours.begin();
-		
-		
-		while (itc != contours.end()) {
-			Rect mr = boundingRect(Mat(*itc));
-			rectangle(frame, mr, Scalar(255, 0, 0), 2);
-			++itc;
-		}*/
+
 		//---------------------------------------------------------------------------------
 
 		printf("red robot face angle: %d  ", (int)(redDirAngle * 180 / CV_PI));
@@ -633,7 +593,6 @@ void CProjectRobotDlg::OnBnClickedButton5()
 		imshow("Red Threshold", imgThreshold_r);
 		imshow("Green Threshold", imgThreshold_g);
 		imshow("Original", frame);
-		imshow("redROI", redROI);
 		//imshow("GreenM", diff_g);
 		//imshow("RedM", diff_r);
 		//imshow("move", diff);
@@ -648,7 +607,6 @@ void CProjectRobotDlg::OnBnClickedButton5()
 			destroyWindow("Red Threshold");
 			destroyWindow("Green Threshold");
 			destroyWindow("Original");
-			destroyWindow("redROI");
 			//destroyWindow("Movement");
 			//destroyWindow("GreenM");
 			//destroyWindow("RedM");
@@ -889,6 +847,22 @@ void CProjectRobotDlg::OnEnChangeEdit4()
 	// 讓具有 ENM_CHANGE 旗標 ORed 加入遮罩。
 
 	// TODO:  在此加入控制項告知處理常式程式碼
+}
+
+void drawOptFlowMap(const Mat& flow, Mat& cflowmap, int step, const Scalar& color) {
+	for (int y = 0; y < cflowmap.rows; y += step)
+
+		for (int x = 0; x < cflowmap.cols; x += step)
+
+		{
+			const Point2f& fxy = flow.at< Point2f>(y, x);
+
+			line(cflowmap, Point(x, y), Point(cvRound(x + fxy.x), cvRound(y + fxy.y)),
+				color);
+			circle(cflowmap, Point(cvRound(x + fxy.x), cvRound(y + fxy.y)), 1, color, -1);
+
+		}
+
 }
 
 
