@@ -274,6 +274,7 @@ void CProjectRobotDlg::OnBnClickedButton1()
 		imshow("MOG", fgMaskMOG);
 		imshow("MOG2", fgMaskMOG2);
 		imshow("GMG", fgMaskGMG);
+		
 
 		if (waitKey(33) == 27) {
 			destroyWindow("original");
@@ -442,7 +443,7 @@ void findContoursandMomentum( Mat &ThreshImg, Mat &img, Point &lastPosition, Poi
 			postPosition.y = dM01 / dArea;
 
 			if (lastPosition.x >= 0 && lastPosition.y >= 0 && postPosition.x >= 0 && postPosition.y >= 0) {
-				//line(img, postPosition, lastPosition, Scalar(0, 0, 255), 2);
+				line(img, postPosition, lastPosition, Scalar(0, 0, 255), 2);
 			}
 			DirAngle = findRobotDirection(RobotDir, img, postPosition, lastPosition);
 			lastPosition.x = postPosition.x;
@@ -520,30 +521,39 @@ void CProjectRobotDlg::OnBnClickedButton5()
 
 	findContoursandMomentum(prevRed, prev, lastPosition_red, postPosition_red, redRobotDir, redDirAngle, redbound);
 	findContoursandMomentum(prevGreen, prev, lastPosition_green, postPosition_green, greenRobotDir, greenDirAngle, greenbound);
+	printf("x:%d, y:%d \n", (int)lastPosition_red.x, (int)lastPosition_red.y);
 
-	/*Kalman filter to find position and velocity of tracking points*/
+	/*Initialize Kalman filter*/
 	int stateSize = 4;
 	int measSize = 2;
 	int contrSize = 0;
 	KalmanFilter KF(stateSize, measSize, contrSize);
-	Mat state(stateSize, 1, CV_32F);
-	Mat meas(measSize, 1, CV_32F);
-	setIdentity(KF.transitionMatrix);
+	
+	Mat_<float> state(4, 1);
+	Mat_<double> processNoise(stateSize, 1, CV_32F);
+	Mat_<double> measurement(measSize, 1);	measurement.setTo(Scalar(0));
+	
 	KF.transitionMatrix = *(Mat_<float>(4, 4) << 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1);
-	Mat_<float> measurement = Mat::zeros(2, 1, CV_32F);
-	Mat processNoise(2, 1, CV_32F);
-	measurement.setTo(Scalar(0));
+	//KF.processNoiseCov = (Mat_<float>(4, 4) << 0.2, 0, 0.2, 0, 0, 0.2, 0, 0.2, 0, 0, 0.3, 0, 0, 0, 0, 0.3);
+
+	Point statePt = (0, 0);
 
 	KF.statePre.at<int>(0) = lastPosition_red.x;
 	KF.statePre.at<int>(1) = lastPosition_red.y;
 	KF.statePre.at<int>(2) = 0;
 	KF.statePre.at<int>(3) = 0;
+
+	setIdentity(KF.transitionMatrix);
 	setIdentity(KF.processNoiseCov, Scalar::all(1e-4));
-	setIdentity(KF.measurementNoiseCov, Scalar::all(10));
-	setIdentity(KF.errorCovPost, Scalar::all(0.1));
+	setIdentity(KF.measurementNoiseCov, Scalar::all(1e-1));
+	setIdentity(KF.errorCovPost, Scalar::all(1));
+
+	Vector<Point> Kalmanv;
+
+	waitKey(0);
 	
 
-	/*start playing video--------------------------------------------*/
+	/*Start playing video--------------------------------------------*/
 	while (true) {
 		cap >> img;
 		frame = img.clone();
@@ -565,13 +575,30 @@ void CProjectRobotDlg::OnBnClickedButton5()
 		findContoursandMomentum(imgThreshold_g, frame, lastPosition_green, postPosition_green, greenRobotDir,greenDirAngle, greenbound);
 		findContoursandMomentum(imgThreshold_r, frame, lastPosition_red, postPosition_red, redRobotDir, redDirAngle, redbound);
 
-
+		printf("x:%d, y:%d \n", (int)lastPosition_red.x, (int)lastPosition_red.y);
 		// use Kalman Filter to track points
+		Mat prediction = KF.predict();
+		Point predictPt(prediction.at<float>(0), prediction.at<float>(1));
 
+		measurement(0) = lastPosition_red.x;
+		measurement(1) = lastPosition_red.y;
+		
 
+		Mat estimated = KF.correct(measurement);
+		Point measPt(measurement(0), measurement(1));
+		statePt.x = estimated.at<float>(0);
+		statePt.y = estimated.at<float>(1);
+		
+		
+		
+		Kalmanv.push_back(statePt);
+
+		for (int i = 0; i < Kalmanv.size(); i++) {
+			line(frame, Kalmanv[i], Kalmanv[i + 1], Scalar(255, 255, 0), 1);
+		}
 
 		//---------------------------------------------------------------------------------
-
+		waitKey(0);
 		printf("red robot face angle: %d  ", (int)(redDirAngle * 180 / CV_PI));
 		printf("green robot face angle: %d  \n", (int)(greenDirAngle * 180 / CV_PI));
 		
