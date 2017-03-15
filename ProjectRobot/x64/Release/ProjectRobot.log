@@ -1,16 +1,18 @@
 ﻿  ProjectRobotDlg.cpp
-ProjectRobotDlg.cpp(369): warning C4244: '=': 將 'double' 轉換為 'float'，由於類型不同，可能導致資料遺失
-ProjectRobotDlg.cpp(408): warning C4244: '=': 將 'double' 轉換為 'int'，由於類型不同，可能導致資料遺失
-ProjectRobotDlg.cpp(424): warning C4244: '正在初始化': 將 'double' 轉換為 'int'，由於類型不同，可能導致資料遺失
-ProjectRobotDlg.cpp(441): warning C4244: '=': 將 'double' 轉換為 'int'，由於類型不同，可能導致資料遺失
-ProjectRobotDlg.cpp(442): warning C4244: '=': 將 'double' 轉換為 'int'，由於類型不同，可能導致資料遺失
-ProjectRobotDlg.cpp(553): warning C4551: 函式呼叫遺漏引數清單
-ProjectRobotDlg.cpp(884): warning C4244: '引數': 將 'float' 轉換為 'int'，由於類型不同，可能導致資料遺失
-ProjectRobotDlg.cpp(892): warning C4244: '引數': 將 'float' 轉換為 'int'，由於類型不同，可能導致資料遺失
+ProjectRobotDlg.cpp(358): warning C4244: '=': 將 'double' 轉換為 'float'，由於類型不同，可能導致資料遺失
+ProjectRobotDlg.cpp(397): warning C4244: '=': 將 'double' 轉換為 'int'，由於類型不同，可能導致資料遺失
+ProjectRobotDlg.cpp(413): warning C4244: '正在初始化': 將 'double' 轉換為 'int'，由於類型不同，可能導致資料遺失
+ProjectRobotDlg.cpp(430): warning C4244: '=': 將 'double' 轉換為 'int'，由於類型不同，可能導致資料遺失
+ProjectRobotDlg.cpp(431): warning C4244: '=': 將 'double' 轉換為 'int'，由於類型不同，可能導致資料遺失
+ProjectRobotDlg.cpp(565): warning C4551: 函式呼叫遺漏引數清單
+ProjectRobotDlg.cpp(905): warning C4244: '引數': 將 'int' 轉換為 'float'，由於類型不同，可能導致資料遺失
+ProjectRobotDlg.cpp(929): warning C4244: '=': 將 'int' 轉換為 'float'，由於類型不同，可能導致資料遺失
+ProjectRobotDlg.cpp(930): warning C4244: '=': 將 'int' 轉換為 'float'，由於類型不同，可能導致資料遺失
+ProjectRobotDlg.cpp(931): warning C4244: '=': 將 'int' 轉換為 'float'，由於類型不同，可能導致資料遺失
   正在產生程式碼
-  23 of 855 functions ( 2.7%) were compiled, the rest were copied from previous compilation.
+  26 of 981 functions ( 2.7%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
-    3 functions had inline decision re-evaluated but remain unchanged
+    6 functions had inline decision re-evaluated but remain unchanged
   已完成程式碼產生
   ProjectRobot.vcxproj -> C:\Users\dungdudu426\documents\visual studio 2015\Projects\ProjectRobot\x64\Release\ProjectRobot.exe
   ProjectRobot.vcxproj -> C:\Users\dungdudu426\documents\visual studio 2015\Projects\ProjectRobot\x64\Release\ProjectRobot.pdb (Full PDB)

@@ -29,24 +29,8 @@
 #include "fstream"
 #include "sstream"
 #include "cmath"
-//
-//#include "opencv2/highgui/highgui.hpp"
-//#include "opencv2/imgproc/imgproc.hpp"
-//#include "opencv2/objdetect/objdetect.hpp"
-//#include "opencv2/video/background_segm.hpp"
-//#include "opencv2/features2d/features2d.hpp"
-//#include "opencv2/opencv_modules.hpp"
-//#include "opencv2/core/utility.hpp"
-//#include "opencv2/video/tracking.hpp"
-//#include "videoio.hpp"
-//#include <cv.h>
-//#include "core.hpp"
-//#include "stdio.h"
-//#include "stdlib.h"
-//
-//#include "iostream"
-//#include "fstream"
-//#include "sstream"
+
+
 
 bool redRobotDir = true; // red moving direction
 bool greenRobotDir = true; // green moving direction
@@ -215,6 +199,10 @@ HCURSOR CProjectRobotDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+void fishEye(Mat &ori, Mat &out) {
+	
+}
+
 
 
 void CProjectRobotDlg::OnBnClickedButton1()
@@ -274,6 +262,7 @@ void CProjectRobotDlg::OnBnClickedButton1()
 		imshow("MOG", fgMaskMOG);
 		imshow("MOG2", fgMaskMOG2);
 		imshow("GMG", fgMaskGMG);
+		
 
 		if (waitKey(33) == 27) {
 			destroyWindow("original");
@@ -341,7 +330,7 @@ void imgprocessing(Mat &imgThreshold) {
 
 }
 
-float findRobotDirection(bool dir, Mat frame, Point postPosition, Point lastPosition) {
+float findRobotDirection(bool dir, Point postPosition, Point lastPosition) {
 	float x1 = 1.00, y1 = 0.00;
 	float x2 = (float)postPosition.x - (float)lastPosition.x;
 	float y2 = (float)postPosition.y - (float)lastPosition.y;
@@ -442,15 +431,31 @@ void findContoursandMomentum( Mat &ThreshImg, Mat &img, Point &lastPosition, Poi
 			postPosition.y = dM01 / dArea;
 
 			if (lastPosition.x >= 0 && lastPosition.y >= 0 && postPosition.x >= 0 && postPosition.y >= 0) {
-				//line(img, postPosition, lastPosition, Scalar(0, 0, 255), 2);
+				line(img, postPosition, lastPosition, Scalar(0, 0, 255), 2);
 			}
-			DirAngle = findRobotDirection(RobotDir, img, postPosition, lastPosition);
-			lastPosition.x = postPosition.x;
-			lastPosition.y = postPosition.y;
+			//DirAngle = findRobotDirection(RobotDir, img, postPosition, lastPosition);
+			//lastPosition.x = postPosition.x;
+			//lastPosition.y = postPosition.y;
 		}
 	}
 	
 }
+
+void MotionDef(bool dir, Point &lastPosition, Point &PostPosition, float &DirAngle, bool &motion) {
+	int difX = abs(lastPosition.x - PostPosition.x);
+	int difY = abs(lastPosition.y - PostPosition.y);
+	float temp_angle = findRobotDirection(dir, PostPosition, lastPosition);
+	lastPosition.x = PostPosition.x;
+	lastPosition.y = PostPosition.y;
+	if (sqrt(difX ^ 2 + difY ^ 2) <= 1) {
+		motion = false;
+	}	
+	else {
+		DirAngle = temp_angle;
+		motion = true;
+	}
+}
+
 
 
 
@@ -479,16 +484,18 @@ void rgb2hsvimg(Mat ori, Mat &red, Mat &green, Mat &imgHSV) {
 
 }
 
-
+Mat H;
 
 
 
 void CProjectRobotDlg::OnBnClickedButton5()
 {
 	// Color Tracking
-	VideoCapture cap("VideoTest.avi");
-	//VideoCapture cap(-1);
+	//VideoCapture cap("VideoTest.avi");
+	VideoCapture cap(-1);
 	Rect redbound, greenbound;
+	bool redMotion = true, greenMotion = true;
+	bool redImgMotion = false, greenImgMotion = false;
 	bool num = true;
 
 
@@ -510,8 +517,13 @@ void CProjectRobotDlg::OnBnClickedButton5()
 
 	vector<Point2f> cornersRed, cornersRed_prev, cornersRed_temp;
 	vector<Point2f> cornersGreen, cornersGreen_prev, cornersGreen_temp;
-	cap >> prev;
+	Mat ori;
+	cap >> ori;
 	/* first image preprocessing-------------------------------------------------------------------------------- */
+	float Z = 1;
+	H.at<float>(2, 2) = Z;
+	warpPerspective(ori, prev, H, Size(img.cols, img.rows), CV_INTER_LINEAR | CV_WARP_INVERSE_MAP | CV_WARP_FILL_OUTLIERS);
+
 	cvtColor(prev, prevGray, CV_RGB2GRAY);
 	rgb2hsvimg(prev, prevRed, prevGreen, imgHSV);
 	imgprocessing(prevRed);
@@ -520,40 +532,41 @@ void CProjectRobotDlg::OnBnClickedButton5()
 
 	findContoursandMomentum(prevRed, prev, lastPosition_red, postPosition_red, redRobotDir, redDirAngle, redbound);
 	findContoursandMomentum(prevGreen, prev, lastPosition_green, postPosition_green, greenRobotDir, greenDirAngle, greenbound);
+	printf("x:%d, y:%d \n", (int)lastPosition_red.x, (int)lastPosition_red.y);
 
-	/*Kalman filter to find position and velocity of tracking points*/
+	/*Initialize Kalman filter*/
 	int stateSize = 4;
 	int measSize = 2;
 	int contrSize = 0;
 	KalmanFilter KF(stateSize, measSize, contrSize);
-	Mat state(stateSize, 1, CV_32F);
-	Mat meas(measSize, 1, CV_32F);
-	setIdentity(KF.transitionMatrix);
+	
+	Mat_<float> state(4, 1);
+	Mat_<double> processNoise(stateSize, 1, CV_32F);
+	Mat_<double> measurement(measSize, 1);	measurement.setTo(Scalar(0));
+	
 	KF.transitionMatrix = *(Mat_<float>(4, 4) << 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1);
-	Mat_<float> measurement = Mat::zeros(2, 1, CV_32F);
-	Mat processNoise(2, 1, CV_32F);
-	measurement.setTo(Scalar(0));
+	//KF.processNoiseCov = (Mat_<float>(4, 4) << 0.2, 0, 0.2, 0, 0, 0.2, 0, 0.2, 0, 0, 0.3, 0, 0, 0, 0, 0.3);
 
-	KF.statePre.at<int>(0) = lastPosition_red.x;
-	KF.statePre.at<int>(1) = lastPosition_red.y;
-	KF.statePre.at<int>(2) = 0;
-	KF.statePre.at<int>(3) = 0;
-	setIdentity(KF.processNoiseCov, Scalar::all(1e-4));
-	setIdentity(KF.measurementNoiseCov, Scalar::all(10));
-	setIdentity(KF.errorCovPost, Scalar::all(0.1));
+	Point statePt = (0, 0);
+
+
+	waitKey(0);
 	
 
-	/*start playing video--------------------------------------------*/
+	/*Start playing video--------------------------------------------*/
 	while (true) {
 		cap >> img;
-		frame = img.clone();
+		
+		//frame = img.clone();
+		imshow("k", img);
 
-		if (frame.empty()) {
+		if (img.empty()) {
 			cout << "Error reading frame from web cam..." << endl;
 			destroyAllWindows;
 			waitKey(0);
 			break;
 		}
+		warpPerspective(img, frame, H, Size(img.cols, img.rows), CV_INTER_LINEAR | CV_WARP_INVERSE_MAP | CV_WARP_FILL_OUTLIERS);
 		rgb2hsvimg(frame, imgThreshold_r, imgThreshold_g, imgHSV);
 
 		// denoise and process the image;
@@ -565,15 +578,19 @@ void CProjectRobotDlg::OnBnClickedButton5()
 		findContoursandMomentum(imgThreshold_g, frame, lastPosition_green, postPosition_green, greenRobotDir,greenDirAngle, greenbound);
 		findContoursandMomentum(imgThreshold_r, frame, lastPosition_red, postPosition_red, redRobotDir, redDirAngle, redbound);
 
+		//printf("x:%d, y:%d \n", (int)lastPosition_red.x, (int)lastPosition_red.y);
 
-		// use Kalman Filter to track points
-
-
+		
+		MotionDef(redMotion, lastPosition_red, postPosition_red, redDirAngle, redImgMotion);
+		MotionDef(greenMotion,lastPosition_green, postPosition_green, greenDirAngle, greenImgMotion);
+		if (redImgMotion == true) 
+			printf("red robot face angle: %d  \n", (int)(redDirAngle * 180 / CV_PI));
+		if (greenImgMotion == true)
+			printf("green robot face angle: %d  \n", (int)(greenDirAngle * 180 / CV_PI));
 
 		//---------------------------------------------------------------------------------
-
-		printf("red robot face angle: %d  ", (int)(redDirAngle * 180 / CV_PI));
-		printf("green robot face angle: %d  \n", (int)(greenDirAngle * 180 / CV_PI));
+		
+		
 		
 		// Show x and y coordinates of every robots.
 		CString red_x, red_y,green_x, green_y;
@@ -594,14 +611,16 @@ void CProjectRobotDlg::OnBnClickedButton5()
 		imshow("Green Threshold", imgThreshold_g);
 		imshow("Original", frame);
 		//imshow("GreenM", diff_g);
-		//imshow("RedM", diff_r);
-		//imshow("move", diff);
-		//imshow("GMG", fgMaskGMG);
 
 		prevGray = gray.clone();
 		prev = img.clone();
 		prevGreen = imgThreshold_g.clone();
 		prevRed = imgThreshold_r.clone();
+		
+		lastPosition_red.x = postPosition_red.x;
+		lastPosition_red.y = postPosition_red.y;
+		lastPosition_green.x = postPosition_green.x;
+		lastPosition_green.y = postPosition_green.y;
 
 		if (waitKey(33) == 27) {
 			destroyWindow("Red Threshold");
@@ -849,64 +868,90 @@ void CProjectRobotDlg::OnEnChangeEdit4()
 	// TODO:  在此加入控制項告知處理常式程式碼
 }
 
-void drawOptFlowMap(const Mat& flow, Mat& cflowmap, int step, const Scalar& color) {
-	for (int y = 0; y < cflowmap.rows; y += step)
-
-		for (int x = 0; x < cflowmap.cols; x += step)
-
-		{
-			const Point2f& fxy = flow.at< Point2f>(y, x);
-
-			line(cflowmap, Point(x, y), Point(cvRound(x + fxy.x), cvRound(y + fxy.y)),
-				color);
-			circle(cflowmap, Point(cvRound(x + fxy.x), cvRound(y + fxy.y)), 1, color, -1);
-
-		}
-
-}
-
-
 
 
 void CProjectRobotDlg::OnBnClickedButton8()
 {
-	// TODO: 在此加入控制項告知處理常式程式碼
-	float s = 1.5;	//global variables
-	Mat GetImg;
-	Mat prvs, next; //current frame
-	VideoCapture stream1(-1);//0 is the id of video device.0 if you have only one camera  
-	
-	//VideoCapture stream1("VideoTest.avi");
-	
-	if (!(stream1.read(GetImg))) //get one frame form video
-		printf("Error reading webcam");
-	resize(GetImg, prvs, Size(GetImg.size().width / s, GetImg.size().height / s));
-	cvtColor(prvs, prvs, CV_BGR2GRAY);
+	int board_dt = 20; 
+	int board_w = 9;
+	int board_h = 7;
+	int board_n = board_w*board_h;
+	Size board_sz = Size(board_w, board_h);
+	int n_boards = 21;
+	Mat intrinsic, distortion;
 
-	//unconditional loop  
-	while (true) {
-		if (!(stream1.read(GetImg))) //get one frame form video  
-			break;
-		//Resize
-		resize(GetImg, next, Size(GetImg.size().width / s, GetImg.size().height / s));
+	vector<vector<Point3f>> object_points;
+	vector<vector<Point2f>> image_points;
+	vector<Point2f> corners;
+	int success = 0;
 
-		cvtColor(next, next, CV_BGR2GRAY);
-
-		///////////////////////////////////////////////////////////////////
-
-		Mat flow;
-		calcOpticalFlowFarneback(prvs, next, flow, 0.5, 3, 15, 3, 5, 1.2, 0);
-		Mat cflow;
-		cvtColor(prvs, cflow, CV_GRAY2BGR);
-		drawOptFlowMap(flow, cflow, 10, CV_RGB(0, 255, 0));
-		imshow("OpticalFlowFarneback", cflow);
-
-		imshow("prvs", prvs);
-		imshow("next", next);
-		if (waitKey(5) >= 0)
-
-			break;
-		prvs = next.clone();
-
+	FileStorage fs("Intrinsic_Matrix.xml", FileStorage::READ);
+	FileStorage fs2("Disortion_Matrix.xml", FileStorage::READ);
+	if (fs.isOpened()) {
+		fs["Intrinsic_Matrix"] >> intrinsic;
+		fs.release();
 	}
+	if (fs2.isOpened()) {
+		fs2["Disortion_Matrix"] >> distortion;
+	}
+	Mat img, gray_img, imageUndistorted;;
+	VideoCapture cap(-1);
+	//VideoCapture cap("VideoTest.avi");
+	cap >> img;
+
+	vector<Point3f>	obj;
+	Point2f objPts[4], imgPts[4];
+	for (int j = 0; j < board_h*board_w; j++) {
+		obj.push_back(Point3f(j / board_h, j%board_w, 0.0f));
+	}
+	
+
+	while (!img.empty()) {
+		cvtColor(img, gray_img, CV_BGR2GRAY);
+		bool found = findChessboardCorners(img, board_sz, corners, CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_FILTER_QUADS);
+		if (found) {
+			cornerSubPix(gray_img, corners, Size(11, 11), Size(-1, -1), TermCriteria(CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 30, 0.1));
+			drawChessboardCorners(img, board_sz, corners, found);
+		}
+		
+		
+		undistort(img, imageUndistorted, intrinsic, distortion);	
+		
+		imshow("undistorted", imageUndistorted);
+		imshow("image", img);
+		imshow("gray_image", gray_img);
+		
+		int c = waitKey(0);
+		if (c == 27) break;
+		else cap >> img;
+	}
+	objPts[0].x = 250;							objPts[0].y = 250;
+	objPts[1].x = 250 + (board_w - 1) * 25;		objPts[1].y = 250;
+	objPts[2].x = 250;							objPts[2].y = (board_h - 1) * 25 + 250;
+	objPts[3].x = (board_w - 1) * 25 + 250;		objPts[3].y = (board_h - 1) * 25 + 250;
+	imgPts[0] = corners[0];
+	imgPts[1] = corners[board_w - 1];
+	imgPts[2] = corners[(board_h - 1)*board_w];
+	imgPts[3] = corners[(board_h - 1)*board_w + board_w - 1];
+	/*for (int h = 0; h < board_h; h++) {
+		for (int w = 0; w < board_w; w++) {
+			objPts[(h+1)*(w+1)]
+		}
+	}*/
+
+	H = getPerspectiveTransform(objPts, imgPts);
+
+	float Z = 1;
+	int k = 0;
+	Mat bird_img = img.clone();
+	namedWindow("Birds Eye");
+	while (k != 27) {
+		cap >> img;
+		H.at<float>(2, 2) = Z;
+		warpPerspective(img, bird_img, H, Size(img.cols, img.rows), CV_INTER_LINEAR | CV_WARP_INVERSE_MAP | CV_WARP_FILL_OUTLIERS);
+		imshow("Birds Eye", bird_img);
+		k = waitKey(33);
+	}
+
+	
 }
