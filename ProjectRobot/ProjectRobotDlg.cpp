@@ -98,10 +98,7 @@ BEGIN_MESSAGE_MAP(CProjectRobotDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
-	ON_BN_CLICKED(IDC_BUTTON1, &CProjectRobotDlg::OnBnClickedButton1)
-	ON_BN_CLICKED(IDC_BUTTON4, &CProjectRobotDlg::OnBnClickedButton4)
 	ON_BN_CLICKED(IDC_BUTTON5, &CProjectRobotDlg::OnBnClickedButton5)
-	ON_BN_CLICKED(IDC_BUTTON3, &CProjectRobotDlg::OnBnClickedButton3)
 	ON_EN_CHANGE(IDC_EDIT1, &CProjectRobotDlg::OnEnChangeEdit1)
 	ON_EN_CHANGE(IDC_EDIT2, &CProjectRobotDlg::OnEnChangeEdit2)
 	ON_EN_CHANGE(IDC_EDIT3, &CProjectRobotDlg::OnEnChangeEdit3)
@@ -205,101 +202,8 @@ void fishEye(Mat &ori, Mat &out) {
 
 
 
-void CProjectRobotDlg::OnBnClickedButton1()
-{
-	Mat frame;
-	Mat fgMaskMOG;
-	Mat fgMaskMOG2;
-	Mat fgMaskGMG;
-	Mat contourImg;
-
-	//Ptr <BackgroundSubtractor> pMOG;
-	//Ptr <BackgroundSubtractor> pMOG2;
-	//Ptr <BackgroundSubtractor> pGMG;
-
-	//pMOG = new BackgroundSubtractorMOG();
-	//pMOG2 = new BackgroundSubtractorMOG2();
-	//pGMG = new BackgroundSubtractorGMG();
-
-	BackgroundSubtractorMOG pMOG;
-	BackgroundSubtractorMOG2 pMOG2;
-	BackgroundSubtractorGMG pGMG;
-
-	Mat element = getStructuringElement(MORPH_RECT, Size(5, 5), Point(1, 1));
-	
-	VideoCapture cap(-1);
-	//VideoCapture cap("VideoTest.avi");
-	while (true)
-	{
-		Mat cameraFrame;
-		if (!cap.read(frame))
-		break;
-		/*pMOG->operator()(frame, fgMaskMOG);
-		pMOG2->operator()(frame, fgMaskMOG2);
-		pGMG->operator()(frame, fgMaskGMG);*/
-
-		pMOG(frame, fgMaskMOG);
-		pMOG2(frame, fgMaskMOG2);
-		pGMG(frame, fgMaskGMG);
-
-		//morphologyEx(fgMaskGMG, fgMaskGMG, CV_MOP_OPEN, element);
-		
-		threshold(fgMaskMOG, contourImg, 128, 255, CV_THRESH_BINARY);
-
-		vector<vector<Point>> contours;
-		findContours(contourImg, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
-
-		vector<Rect> output;
-		vector<vector<Point>>::iterator itc = contours.begin();
-
-		while (itc != contours.end()) {
-			Rect mr = boundingRect(Mat(*itc));
-			rectangle(frame, mr, Scalar(255, 0, 0), 2);
-			++itc;
-		}
-
-		imshow("original", frame);
-		imshow("MOG", fgMaskMOG);
-		imshow("MOG2", fgMaskMOG2);
-		imshow("GMG", fgMaskGMG);
-		
-
-		if (waitKey(33) == 27) {
-			destroyWindow("original");
-			destroyWindow("MOG");
-			destroyWindow("MOG2");
-			destroyWindow("GMG");
-			break;
-		}
-	}
-
-}
 
 
-
-void CProjectRobotDlg::OnBnClickedButton4()
-{
-	VideoCapture capture(-1);
-	if (!capture.isOpened()) {
-		printf("Error finding camera...");
-	}
-	Size videoSize = Size((int)capture.get(CV_CAP_PROP_FRAME_WIDTH), (int)capture.get(CV_CAP_PROP_FRAME_HEIGHT));
-	VideoWriter writer;
-	writer.open("VideoTest.avi", CV_FOURCC('M', 'J', 'P', 'G'), 30, videoSize);
-	namedWindow("show image", 0);
-
-	while (true) {
-		Mat frame;
-		capture >> frame;
-		if (!frame.empty()) {
-			writer.write(frame);
-			imshow("show image", frame);
-			if (waitKey(33) == 27) {
-				break;
-			}
-		}
-	}
-}
 
 // Lower red hue range
 int iLowH = 0;		int iHighH = 10;	
@@ -533,23 +437,6 @@ void CProjectRobotDlg::OnBnClickedButton5()
 	findContoursandMomentum(prevRed, prev, lastPosition_red, postPosition_red, redRobotDir, redDirAngle, redbound);
 	findContoursandMomentum(prevGreen, prev, lastPosition_green, postPosition_green, greenRobotDir, greenDirAngle, greenbound);
 	printf("x:%d, y:%d \n", (int)lastPosition_red.x, (int)lastPosition_red.y);
-
-	/*Initialize Kalman filter*/
-	int stateSize = 4;
-	int measSize = 2;
-	int contrSize = 0;
-	KalmanFilter KF(stateSize, measSize, contrSize);
-	
-	Mat_<float> state(4, 1);
-	Mat_<double> processNoise(stateSize, 1, CV_32F);
-	Mat_<double> measurement(measSize, 1);	measurement.setTo(Scalar(0));
-	
-	KF.transitionMatrix = *(Mat_<float>(4, 4) << 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1);
-	//KF.processNoiseCov = (Mat_<float>(4, 4) << 0.2, 0, 0.2, 0, 0, 0.2, 0, 0.2, 0, 0, 0.3, 0, 0, 0, 0, 0.3);
-
-	Point statePt = (0, 0);
-
-
 	waitKey(0);
 	
 
@@ -637,52 +524,6 @@ void CProjectRobotDlg::OnBnClickedButton5()
 
 }
 
-
-
-void CProjectRobotDlg::OnBnClickedButton3()
-{
-	vector<Rect> robot;
-	Mat frame, gray_frame;
-	String Robot_cascade_name = "cascade_1.xml";
-	//VideoCapture capture("VIDEO0032.mp4");
-	//VideoCapture capture("VIDEO0063.mp4");
-	VideoCapture capture("VideoTest.avi");
-	capture >> frame;
-
-	CascadeClassifier robot_cascade;
-	while (1) {
-		capture >> frame;
-		if (!capture.isOpened()) {
-			break;
-		}
-		cvtColor(frame, gray_frame, CV_RGB2GRAY);
-		equalizeHist(gray_frame, gray_frame);
-		if (!robot_cascade.load(Robot_cascade_name)) {
-			printf("--(!)Error loading robot cscade\n");
-			break;
-		}
-
-		robot_cascade.detectMultiScale(gray_frame, robot, 1.1, 20, 0 | CV_HAAR_SCALE_IMAGE, Size(70, 70));
-		for (size_t i = 0; i < robot.size(); i++) {
-			Mat faceROI = gray_frame(robot[i]);
-			int x = robot[i].x;
-			int y = robot[i].y;
-			int h = y + robot[i].height;
-			int w = x + robot[i].width;
-			rectangle(
-				frame, Point(x, y), Point(w, h), Scalar(255, 0, 0), 2, 8, 0
-			);
-		}
-		namedWindow("Robot", 2);
-		imshow("Robot", frame);
-		int c = waitKey(2);
-		if (c == 27) {
-			destroyWindow("Robot");
-			break;
-		}
-	}
-
-}
 
 vector<Mat> RobotImg;
 
