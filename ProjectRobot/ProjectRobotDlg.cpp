@@ -422,11 +422,12 @@ void CProjectRobotDlg::OnBnClickedButton5()
 	vector<Point2f> cornersRed, cornersRed_prev, cornersRed_temp;
 	vector<Point2f> cornersGreen, cornersGreen_prev, cornersGreen_temp;
 	Mat ori;
-	cap >> ori;
+	cap >> prev;
 	/* first image preprocessing-------------------------------------------------------------------------------- */
-	float Z = 1;
-	H.at<float>(2, 2) = Z;
-	warpPerspective(ori, prev, H, Size(img.cols, img.rows), CV_INTER_LINEAR | CV_WARP_INVERSE_MAP | CV_WARP_FILL_OUTLIERS);
+	//float Z = 1;
+	//H.at<float>(2, 2) = Z;
+	//warpPerspective(ori, prev, H, Size(img.cols, img.rows), CV_INTER_LINEAR | CV_WARP_INVERSE_MAP | CV_WARP_FILL_OUTLIERS);
+	
 
 	cvtColor(prev, prevGray, CV_RGB2GRAY);
 	rgb2hsvimg(prev, prevRed, prevGreen, imgHSV);
@@ -453,8 +454,8 @@ void CProjectRobotDlg::OnBnClickedButton5()
 			waitKey(0);
 			break;
 		}
-		warpPerspective(img, frame, H, Size(img.cols, img.rows), CV_INTER_LINEAR | CV_WARP_INVERSE_MAP | CV_WARP_FILL_OUTLIERS);
-		rgb2hsvimg(frame, imgThreshold_r, imgThreshold_g, imgHSV);
+		//warpPerspective(img, frame, H, Size(img.cols, img.rows), CV_INTER_LINEAR | CV_WARP_INVERSE_MAP | CV_WARP_FILL_OUTLIERS);
+		rgb2hsvimg(img, imgThreshold_r, imgThreshold_g, imgHSV);
 
 		// denoise and process the image;
 		imgprocessing(imgThreshold_r);
@@ -496,7 +497,7 @@ void CProjectRobotDlg::OnBnClickedButton5()
 		//imshow("Smooth", Smooth);
 		imshow("Red Threshold", imgThreshold_r);
 		imshow("Green Threshold", imgThreshold_g);
-		imshow("Original", frame);
+		imshow("Original", img);
 		//imshow("GreenM", diff_g);
 
 		prevGray = gray.clone();
