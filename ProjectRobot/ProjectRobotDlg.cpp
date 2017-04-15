@@ -275,7 +275,7 @@ float findRobotDirection(bool dir, Point postPosition, Point lastPosition) {
 
 
 
-void findContoursandMomentum( Mat &ThreshImg, Mat &img, Point &lastPosition, Point &postPosition, bool &RobotDir, float &DirAngle, Rect &colorbound) { // for find the contours and minimum enclosing circle of the picture
+void findContoursandMomentum( Mat &ThreshImg, Mat &img,  Point &postPosition, bool &RobotDir, float &DirAngle, Rect &colorbound) { // for find the contours and minimum enclosing circle of the picture
 	int largest_area = 0;
 	int largest_area_index = 0;
 	Mat canny, oriThresh;
@@ -334,9 +334,9 @@ void findContoursandMomentum( Mat &ThreshImg, Mat &img, Point &lastPosition, Poi
 			postPosition.x = dM10 / dArea;
 			postPosition.y = dM01 / dArea;
 
-			if (lastPosition.x >= 0 && lastPosition.y >= 0 && postPosition.x >= 0 && postPosition.y >= 0) {
-				line(img, postPosition, lastPosition, Scalar(0, 0, 255), 2);
-			}
+			//if (lastPosition.x >= 0 && lastPosition.y >= 0 && postPosition.x >= 0 && postPosition.y >= 0) {
+			//	line(img, postPosition, lastPosition, Scalar(0, 0, 255), 2);
+			//}
 			//DirAngle = findRobotDirection(RobotDir, img, postPosition, lastPosition);
 			//lastPosition.x = postPosition.x;
 			//lastPosition.y = postPosition.y;
@@ -349,8 +349,8 @@ void MotionDef(bool dir, Point &lastPosition, Point &PostPosition, float &DirAng
 	int difX = abs(lastPosition.x - PostPosition.x);
 	int difY = abs(lastPosition.y - PostPosition.y);
 	float temp_angle = findRobotDirection(dir, PostPosition, lastPosition);
-	lastPosition.x = PostPosition.x;
-	lastPosition.y = PostPosition.y;
+	//lastPosition.x = PostPosition.x;
+	//lastPosition.y = PostPosition.y;
 	if (sqrt(difX ^ 2 + difY ^ 2) <= 1) {
 		motion = false;
 	}	
@@ -390,13 +390,43 @@ void rgb2hsvimg(Mat ori, Mat &red, Mat &green, Mat &imgHSV) {
 
 Mat H;
 
+void onMouse(int Event, int x, int y, int flags, void* param);
+Point MouseFirst, MouseSecond;
+float RobotLen = 157; // the size of a robot in the image
+
+// Robot route using Bezier Curve
+void  BezierCurve( Mat &img, Point StartPoint_last, Point StartPoint_post, Point EndPoint_last, Point EndPoint_post, vector<Point> route ) {
+	
+	int thickness = 1;
+	int lineType = 8;
+	float dis = sqrt((StartPoint_last.x - StartPoint_post.x)^2 + (StartPoint_last.y - StartPoint_post.y) ^ 2);
+	float x, y;
+	Point routePoint, tempPoint;
+	tempPoint.x = ((float)RobotLen * (StartPoint_post.x - StartPoint_last.x) / dis) + StartPoint_post.x;
+	tempPoint.y = ((float)RobotLen * (StartPoint_post.y - StartPoint_last.y) / dis) + StartPoint_post.y;
+	for (float t = 0.0l; t < 1.0l; t += 0.01) {
+		routePoint = (-t*t*t + 3 * t*t - 3 * t + 1) * StartPoint_last
+			+ (3 * t*t*t - 6 * t*t + 3 * t)			* StartPoint_post
+			+ (-3 * t*t*t + 3 * t*t)				* EndPoint_last
+			+ (t*t*t)								* EndPoint_post;
+		route.push_back(routePoint);
+		
+	}
+
+	for (int i = 0; i < route.size() - 1; i++) {
+		//cout << '(' << route[i].x << ',' << route[i].y << ')';
+		line(img, route[i], route[i + 1], Scalar(0, 255, 255));
+	}
+
+	waitKey(0);
+}
 
 
 void CProjectRobotDlg::OnBnClickedButton5()
 {
 	// Color Tracking
-	//VideoCapture cap("VideoTest.avi");
-	VideoCapture cap(-1);
+	VideoCapture cap("VideoTest.avi");
+	//VideoCapture cap(-1);
 	Rect redbound, greenbound;
 	bool redMotion = true, greenMotion = true;
 	bool redImgMotion = false, greenImgMotion = false;
@@ -415,12 +445,11 @@ void CProjectRobotDlg::OnBnClickedButton5()
 	Mat imgThreshold_r; // the combined red image
 	Mat prevGreen, prevRed;
 
+	vector<Point> redRoute;
+	vector<Point> greenRoute;
 
-	BackgroundSubtractorGMG pGMG;
-	Mat fgMaskGMG;
-
-	vector<Point2f> cornersRed, cornersRed_prev, cornersRed_temp;
-	vector<Point2f> cornersGreen, cornersGreen_prev, cornersGreen_temp;
+	//vector<Point2f> cornersRed, cornersRed_prev, cornersRed_temp;
+	//vector<Point2f> cornersGreen, cornersGreen_prev, cornersGreen_temp;
 	Mat ori;
 	cap >> prev;
 	/* first image preprocessing-------------------------------------------------------------------------------- */
@@ -435,9 +464,14 @@ void CProjectRobotDlg::OnBnClickedButton5()
 	imgprocessing(prevGreen);
 
 
-	findContoursandMomentum(prevRed, prev, lastPosition_red, postPosition_red, redRobotDir, redDirAngle, redbound);
-	findContoursandMomentum(prevGreen, prev, lastPosition_green, postPosition_green, greenRobotDir, greenDirAngle, greenbound);
+	findContoursandMomentum(prevRed, prev, lastPosition_red, redRobotDir, redDirAngle, redbound);
+	findContoursandMomentum(prevGreen, prev, lastPosition_green, greenRobotDir, greenDirAngle, greenbound);
+	
 	printf("x:%d, y:%d \n", (int)lastPosition_red.x, (int)lastPosition_red.y);
+
+	imshow("Original", prev);
+	
+
 	waitKey(0);
 	
 
@@ -445,8 +479,7 @@ void CProjectRobotDlg::OnBnClickedButton5()
 	while (true) {
 		cap >> img;
 		
-		//frame = img.clone();
-		imshow("k", img);
+		frame = img.clone();
 
 		if (img.empty()) {
 			cout << "Error reading frame from web cam..." << endl;
@@ -463,18 +496,22 @@ void CProjectRobotDlg::OnBnClickedButton5()
 
 		//find the biggest contours in the image and calculate the moments of the threshold image;
 		// and find out robots current face direction
-		findContoursandMomentum(imgThreshold_g, frame, lastPosition_green, postPosition_green, greenRobotDir,greenDirAngle, greenbound);
-		findContoursandMomentum(imgThreshold_r, frame, lastPosition_red, postPosition_red, redRobotDir, redDirAngle, redbound);
+		findContoursandMomentum(imgThreshold_g, frame,  postPosition_green, greenRobotDir,greenDirAngle, greenbound);
+		findContoursandMomentum(imgThreshold_r, frame,  postPosition_red, redRobotDir, redDirAngle, redbound);
 
 		//printf("x:%d, y:%d \n", (int)lastPosition_red.x, (int)lastPosition_red.y);
 
 		
 		MotionDef(redMotion, lastPosition_red, postPosition_red, redDirAngle, redImgMotion);
 		MotionDef(greenMotion,lastPosition_green, postPosition_green, greenDirAngle, greenImgMotion);
-		if (redImgMotion == true) 
-			printf("red robot face angle: %d  \n", (int)(redDirAngle * 180 / CV_PI));
-		if (greenImgMotion == true)
-			printf("green robot face angle: %d  \n", (int)(greenDirAngle * 180 / CV_PI));
+		
+		
+		
+		// Show the angle of every robot
+		//if (redImgMotion == true) 
+		//	printf("red robot face angle: %d  \n", (int)(redDirAngle * 180 / CV_PI));
+		//if (greenImgMotion == true)
+		//	printf("green robot face angle: %d  \n", (int)(greenDirAngle * 180 / CV_PI));
 
 		//---------------------------------------------------------------------------------
 		
@@ -500,17 +537,8 @@ void CProjectRobotDlg::OnBnClickedButton5()
 		imshow("Original", img);
 		//imshow("GreenM", diff_g);
 
-		prevGray = gray.clone();
-		prev = img.clone();
-		prevGreen = imgThreshold_g.clone();
-		prevRed = imgThreshold_r.clone();
-		
-		lastPosition_red.x = postPosition_red.x;
-		lastPosition_red.y = postPosition_red.y;
-		lastPosition_green.x = postPosition_green.x;
-		lastPosition_green.y = postPosition_green.y;
-
-		if (waitKey(33) == 27) {
+		char c = waitKey(33);
+		if (c == 27) {
 			destroyWindow("Red Threshold");
 			destroyWindow("Green Threshold");
 			destroyWindow("Original");
@@ -521,8 +549,58 @@ void CProjectRobotDlg::OnBnClickedButton5()
 
 			break;
 		}
+		else if (c == 's') {
+			//waitKey(0);
+			printf("Post: x:%d, y:%d \n", (int)postPosition_red.x, (int)postPosition_red.y);
+			printf("Last: x:%d, y:%d \n", (int)lastPosition_red.x, (int)lastPosition_red.y);
+			imshow("Position", img);
+			setMouseCallback("Position", onMouse, NULL);
+			waitKey(0);
+			line(img, MouseFirst, MouseSecond, Scalar(0, 255, 255), 1, 8, 0);
+			BezierCurve(img, lastPosition_red, postPosition_red, MouseFirst, MouseSecond, redRoute);
+
+			Point SecondPosition_last = lastPosition_green + RobotLen / sqrt((MouseFirst.x - MouseSecond.x) ^ 2 + (MouseFirst.y - MouseSecond.y) ^ 2) * 
+				(lastPosition_green - postPosition_green);
+			Point SecondPosition_post = postPosition_green + RobotLen / sqrt((MouseFirst.x - MouseSecond.x) ^ 2 + (MouseFirst.y - MouseSecond.y) ^ 2) *
+				(lastPosition_green - postPosition_green);
+			BezierCurve(img, lastPosition_green, postPosition_green, MouseFirst, MouseSecond, greenRoute);
+			
+			imshow("Position", img);
+			waitKey(0);
+
+		}
+		c = NULL;
+		prevGray = gray.clone();
+		prev = img.clone();
+		prevGreen = imgThreshold_g.clone();
+		prevRed = imgThreshold_r.clone();
+
+		if (redMotion) {
+			
+			lastPosition_red.x = postPosition_red.x;
+			lastPosition_red.y = postPosition_red.y;
+		}
+		if (greenMotion) {
+			lastPosition_green.x = postPosition_green.x;
+			lastPosition_green.y = postPosition_green.y;
+		}
+		
 	}
 
+}
+
+void onMouse(int Event, int x, int y, int flags, void * param) {
+	if (Event == CV_EVENT_LBUTTONDOWN) {
+		MouseFirst.x = x;
+		MouseFirst.y = y;
+		printf("Fist Position , X:%d, Y:%d.\n", MouseFirst.x, MouseFirst.y);
+	}
+	if (Event == CV_EVENT_LBUTTONUP) {
+		MouseSecond.x = x;
+		MouseSecond.y = y;
+		printf("Second Position , X:%d, Y:%d. \n", MouseSecond.x, MouseSecond.y);
+	}
+	
 }
 
 
@@ -567,6 +645,7 @@ void CProjectRobotDlg::OnBnClickedButton7()
 	}
 
 	Mat frame;
+	
 	cap >> frame;
 	while (true) {
 		cap >> frame;
